@@ -1,0 +1,25 @@
+{
+  "name": "grel-reverse-proxy",
+  "version": "1.0.0",
+  "description": "GREL Reverse Proxy Server",
+  "main": "src/grel-reverse-proxy.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Gary L Skiba",
+  "license": "MIT",
+  "dependencies": {
+    "@google-cloud/logging-winston": "^5.1.0",
+    "date-fns": "^2.28.0",
+    "express": "^4.18.1",
+    "express-session": "^1.17.3",
+    "express-useragent": "^1.0.15",
+    "helmet": "^6.1.5",
+    "http-proxy-middleware": "^2.0.6",
+    "json-stringify-safe": "^5.0.1",
+    "lodash": "^4.17.21",
+    "serve-static": "^1.15.0",
+    "vhost": "^3.0.2",
+    "winston": "^3.8.1"
+  }
+}
