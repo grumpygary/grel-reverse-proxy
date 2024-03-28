@@ -29,7 +29,7 @@ let configFile;
 try {
     configFile = require(`${__dirname}/../proxy-config.js`);
 } catch (err) {
-    logger.log(`You must provide a "proxy-config.js" file.  See readme.md for details.`)
+    logger.log(`You must provide a "proxy-config.js" file.  You can copy 'sample-config.js' to get started.   See readme.md for details.`)
     process.exit(-1);
 }
 let logger = require("../lib/grel-logging.js");
