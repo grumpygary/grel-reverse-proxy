@@ -32,7 +32,13 @@ npm install "grel-reverse-proxy"
 git clone "https://github.com/grumpygary/grel-reverse-proxy"
 ```
 
-# 
+# Setup
+
+30-Mar-2024 - undergoing maintenance.  Will be unstable today.
+
+proxy-config.js must be in the project
+
+
 
 ## Configuration Options
 
