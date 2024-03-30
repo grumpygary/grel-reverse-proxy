@@ -3,7 +3,7 @@
 # Reverse Proxy Server
 
 Setup an HTTPS reverse proxy server on your desktop to expose static and dynamic sites.
-Supports SSL certificates.  No Code, just config!
+Requires SSL certificates.  No Code, just config!
 
 I was frustrated with the available options, and didn't want to use NGINX locally.
 I wanted one that was node based, but used a config file, and allowed me to customize.  This is the result. It's been working on my desktop (with 10 domains) since 2019.

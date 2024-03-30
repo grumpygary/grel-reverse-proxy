@@ -26,6 +26,9 @@ const serveStatic = require('serve-static')
 let logger = require("../lib/grel-logging.js");
 // const { response } = require("express");
 
+//------------------------------------------------------------
+// this is the entry point for the reverse proxy server
+//------------------------------------------------------------
 const startProxy = async (configFile) => {
     if (!configFile) {
         let name = `proxy-config.js`;
@@ -72,55 +75,10 @@ const startProxy = async (configFile) => {
         // next();
     }
 
-    const trimMultiLineString = (str0, options = {}) => {
-        let str = str0;
-        // 2019 - Only trim the beginning
-        // in markdown, extra spaces at the end will force a line break.
-        if (str !== undefined && typeof (str) == 'string') {
-            var lines0 = str.split("\n"),
-                lines = [];
-            if (lines0.length > 1) {
-                let starts = "";
-                if (options.markdown !== false) {
-                    let nLines = 0, li;
-                    let trimSpaces = 1000;
-                    lines0.forEach(line => {
-                        let leadingSpaces = 0;
-                        if (line.trimStart().length) {
-                            for (li = 0; line[li] <= " " && li < line.length; li++) {
-                                leadingSpaces++;
-                            }
-                            if (nLines && leadingSpaces < trimSpaces) {
-                                trimSpaces = leadingSpaces;
-                            }
-                        }
-                        nLines++; // after the first line we don't care
-                    }, 1000);
-                    // trimSpaces should now be the # spaces on ALL lines after the first one
-                    if (trimSpaces && trimSpaces < 1000) {
-                        starts = _.repeat(" ", trimSpaces);
-                    }
-                }
-                _.forEach(lines0, (line, index) => {
-                    let txt = line, trimmed, bol;
-                    if (starts) {
-                        bol = txt.substr(0, starts.length);
-                        if (bol == starts) {
-                            txt = txt.substr(starts.length);
-                        }
-                    }
-                    trimmed = txt.trimEnd();
-                    if (lines.length || trimmed) 
-                        lines.push(txt)
-                });
-                str = lines.join('\n');
-            }
-        }
-        return str;
-    }
     const siteList = ['unsplash.com','google.com','gstatic.com','googleapis.com','storage.googleapis.com','cdn-apple.com','validator.fovea.cc','mux.com','grel.us',];
     let sites =  siteList.map(s=>`*.${s}`).join(" ");
 
+    // default CONTENT-SECURITY-POLICY
     let __csp = `default-src 'self';
     connect-src * data: blob: filesystem: ${sites};
     style-src 'self' data: 'unsafe-inline' *.google.com *.googleapis.com;
@@ -130,7 +88,6 @@ const startProxy = async (configFile) => {
     script-src 'self' 'unsafe-inline' data: *.google.com *.googleapis.com ${sites};
     media-src * data: blob: filesystem: ${sites};
     `
-    // __csp = trimMultiLineString(__csp);
     __csp = __csp.replace(/\n/g," ").replace(/  /g," ").replace(/  /g," ").replace(/  /g," ")
 
     //=============================================================================================
@@ -157,7 +114,7 @@ const startProxy = async (configFile) => {
             return idx === 0 ? defaultStaticRoot.length : 0;
         }
     }
-    const parseStatic = (_folder,options = {}) => {
+    const parseStaticFolderSpec = (_folder,options = {}) => {
         let prefix = _folder[0].toUpperCase(), tmp, relative = true;
         switch(prefix) {
             case ".": tmp = _folder; break;
@@ -187,12 +144,13 @@ const startProxy = async (configFile) => {
     }
     let certFolder = resPath(configFile.certRoot);
     let defaultStaticRoot = ""; 
-    defaultStaticRoot = parseStatic(configFile.staticRoot || `${__dirname}/../../${configFile.staticRoot}`).folder;
+    defaultStaticRoot = parseStaticFolderSpec(configFile.staticRoot || `${__dirname}/../../${configFile.staticRoot}`).folder;
 
     verbose(`[REV-PROXY-FOLDERS]`)
     verbose(`    certs  :`,certFolder)
     verbose(`    statics:`,defaultStaticRoot)
-    const loadCerts = (domain) => {
+
+    const loadDomainCertificateFiles = (domain) => {
         let domainFilePathAndBase = `${certFolder}/${domain}/${domain}`, key, cert, ca;
         try {
             key = fs.readFileSync(`${domainFilePathAndBase}.key`,'utf8');
@@ -241,6 +199,9 @@ const startProxy = async (configFile) => {
 
     const __domainPermissions = {};
     let ipRequests = {};
+    /*
+        This is the main setup function for the reverse proxy server.
+    */
     const setupServers = (configFile) => {
         let { domains: targets } = configFile;
         let vHosts = express();
@@ -249,6 +210,7 @@ const startProxy = async (configFile) => {
         let allowedIpAddresses = configFile.allowedIpAddresses || {};
         let allowedUrlPaths = configFile.allowedUrlPaths || [];
         if (!configFile.commands) configFile.commands = {};
+        // local functions for THIS domain-name
         const cmdFunctions = {
             pset: (rq,resp,next) => { 
                 let key = rq.params.key, value = rq.params.value, v;
@@ -304,7 +266,20 @@ const startProxy = async (configFile) => {
                 }    
             })
         }
-        const addServer = (name) => {
+        const addServerForDomain = (name) => {
+            /*
+            1 - load certificates for sub-domain - REQUIRED for all domains
+            2 - setup permissions for the sub-domain (if desired)
+            3 - setup express server the the sub-domain
+            4 - setup the proxy for the sub-domain
+                - create handlers for:
+                    - proxy control
+                    - redirects
+                    - static folders
+                    - static headers
+                    - handling requests (serve, redirect, etc)
+            5 - add the domain to the server's vHosts
+            */
             try {
                 let targetConfig = targets[name];
                 if (targetConfig) {
@@ -331,8 +306,10 @@ const startProxy = async (configFile) => {
                         logger.log(`[REV-PROXY-SETUP] initializing: {${domain}}`,staticFolders ? `--${statics}--` : ``)
                     }
 
+                    // LOAD CERTIFICATES
+
                     let siteConfig, dest = "";
-                    let { key, cert, ca } = loadCerts(domain);
+                    let { key, cert, ca } = loadDomainCertificateFiles(domain);
                     try {
                         if (key && cert && ca && (target || port || staticFolders)) {
                             // setup the SSL
@@ -353,6 +330,8 @@ const startProxy = async (configFile) => {
                                 if (!permissions) permissions = allowedIpAddresses;
                                 else verbose(`[SITE-PERMISSIONS]`,JSON.stringify(permissions));
                             }
+
+                            // SETUP PERMISSIONS if desired
                             if (permissions) {
                                 let { allowedIpAddresses: ipAddresses, safe } = permissions;
                                 safe = safe !== false;
@@ -406,10 +385,14 @@ const startProxy = async (configFile) => {
                                     })
                                 }
                             }
+
+                            // SETUP EXPRESS SERVER FOR DOMAIN
+
                             app.use(helmet());
                             app.use(allowCrossDomain);
 
                             app.use(ipUsage)
+
                             if (control = siteConfig.proxyControl) {
                                 //================ RUNTIME HANDLER ================                         PROXY COMMANDS
                                 proxyCmds(app, control);
@@ -450,9 +433,9 @@ const startProxy = async (configFile) => {
                                                     break;
                                             }
                                             if (folder) {
-                                                let { folder: _folder, prefix, relativeIndex } = parseStatic(folder), _root;
+                                                let { folder: _folder, prefix, relativeIndex } = parseStaticFolderSpec(folder), _root;
                                                 folder = _folder;
-                                                let tmp = parseStatic(siteConfig.root || folder);
+                                                let tmp = parseStaticFolderSpec(siteConfig.root || folder);
                                                 _root = tmp.folder;
                                                 // if (!staticRoot) 
                                                 // {
@@ -477,7 +460,7 @@ const startProxy = async (configFile) => {
                                         staticDefs.push(def);
                                         staticRoot = def.root;
                                     } else {
-                                        let tmp = parseStatic(siteConfig.root || staticFolders);
+                                        let tmp = parseStaticFolderSpec(siteConfig.root || staticFolders);
                                         staticRoot = tmp.folder;
                                         if (Array.isArray(staticFolders)) {
                                             staticDefs = staticFolders.map(f=>stdFolderDef(f,"array"));
@@ -552,6 +535,9 @@ const startProxy = async (configFile) => {
                                             fallthrough: false,
                                             dotfiles: "deny",
                                         } );
+
+                                        // setup static headers if desired
+
                                         if (configFile.staticHeaders) {
                                             const staticHeaders = configFile.staticHeaders;
                                             const cspSites = configFile.cspSites || targetConfig.cspSites;
@@ -632,6 +618,9 @@ const startProxy = async (configFile) => {
                                 }
                             } else {
                             }
+
+                            // ADD DOMAIN to SERVER VHOSTS
+
                             vHosts.use(vhost(domain,app));
                             if (!target) {
                                 if (port) {
@@ -675,12 +664,21 @@ const startProxy = async (configFile) => {
             }
         };
 
-        Object.keys(targets).forEach(key => addServer(key));
+        Object.keys(targets).forEach(key => addServerForDomain(key));
         return {
             vHosts,
             sslDomains,
         }
     }
+
+    /*
+        Once the servers have been setup, we can start the reverse proxy server.
+
+        The vHost define the domains and the servers that will handle the requests.
+
+        Each request must be validated to ensure that the request is 
+        for a handled domain, and then directed to that server.
+    */
 
     let httpsServer;
     const startServer = (cfg) => {
@@ -712,6 +710,7 @@ const startProxy = async (configFile) => {
         };
 
         if (httpPort) {
+            // If the request is HTTP, redirect to HTTPS
 
             httpServer.createServer(httpOptions,function (rq, resp) {
                 let domain;
@@ -775,6 +774,8 @@ const startProxy = async (configFile) => {
 
     let { vHosts, sslDomains, } = setupServers(configFile);
 
+    // Let the good times roll!
+
     startServer({
         vHosts,
         sslPort: configFile.port,
@@ -782,4 +783,5 @@ const startProxy = async (configFile) => {
         sslDomains,
     });
 }
+
 module.exports = startProxy;
