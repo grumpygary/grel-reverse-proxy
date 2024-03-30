@@ -1,6 +1,6 @@
 {
   "name": "grel-reverse-proxy",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "GREL Reverse Proxy Server",
   "main": "src/grel-reverse-proxy.js",
   "scripts": {
