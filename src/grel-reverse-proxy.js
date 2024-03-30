@@ -28,9 +28,11 @@ let logger = require("../lib/grel-logging.js");
 
 const startProxy = async (configFile) => {
     if (!configFile) {
-        let name = `./proxy-config.js`;
-        if (await fs.existsSync(name)) {
-            configFile = fs.readFileSync(name);
+        let name = `proxy-config.js`;
+        let cwd = process.cwd();
+        let filePath = path.join(cwd,name);
+        if (await fs.existsSync(filePath)) {
+            configFile = require(filePath); //fs.readFileSync(name,'utf8');
         }
     }
     if (!configFile) {
@@ -178,6 +180,11 @@ const startProxy = async (configFile) => {
         return { folder, prefix, relativeIndex };
     }
 
+    if (!configFile.certRoot) {
+        let str = `You MUST supply a 'certRoot' in the configOptions.  See readme.md for details.`;
+        console.error(str);
+        throw str;
+    }
     let certFolder = resPath(configFile.certRoot);
     let defaultStaticRoot = ""; 
     defaultStaticRoot = parseStatic(configFile.staticRoot || `${__dirname}/../../${configFile.staticRoot}`).folder;
@@ -188,9 +195,9 @@ const startProxy = async (configFile) => {
     const loadCerts = (domain) => {
         let domainFilePathAndBase = `${certFolder}/${domain}/${domain}`, key, cert, ca;
         try {
-            key = fs.readFileSync(`${domainFilePathAndBase}.key`);
-            cert = fs.readFileSync(`${domainFilePathAndBase}.pem`);
-            ca = fs.readFileSync(`${domainFilePathAndBase}.ca_bundle`); 
+            key = fs.readFileSync(`${domainFilePathAndBase}.key`,'utf8');
+            cert = fs.readFileSync(`${domainFilePathAndBase}.pem`,'utf8');
+            ca = fs.readFileSync(`${domainFilePathAndBase}.ca_bundle`,'utf8'); 
             return { domainFilePathAndBase, key, cert, ca };    
         } catch (err) {
             return {};

@@ -32,13 +32,30 @@ npm install "grel-reverse-proxy"
 git clone "https://github.com/grumpygary/grel-reverse-proxy"
 ```
 
-# Setup
+# Usage
 
-30-Mar-2024 - undergoing maintenance.  Will be unstable today.
+## Simple Config
+```
+// proxy-config.js
+// For more examples, see 'sample-config.js' below and in module source
+module.exports = {
+    certRoot: "~/my-certs",
+    staticRoot: "~/static-www-sites", // referenced by "$" below
+    domains: {
+        "sub.mydomain.com": {
+            staticFolder: "$/sub-domain",
+            home: "/index.html", // from root of static folder
+        },
+  },
+}
+```
 
-proxy-config.js must be in the project
-
-
+## Running the Server
+```
+const revProxyServer = require('grel-reverse-proxy');
+let configOptions; // if undefined, will use "proxy-config.js" in cwd
+revProxyServer(configOptions); // run server --  see below
+```
 
 ## Configuration Options
 
@@ -51,34 +68,31 @@ name                    | type     | default     | description
 ------------------------|----------|-------------|-------------------------------------------------
 verbose                 | bool     | false       | log config msgs during startup
 staticHeaders           | object   |             | applied to every response (Content-Security-Policy: true or string -- if includes {{sites}} can customize by domain)
-certRoot                | string   |             | where to find domins certs (names domain folders with .crt .ey and .ca_bundle files)
-staticRoot              | string   |             | folder where static folders are placed (when using "$" & "~")
-staticPorts             | number   | 8100        | first post for static sites
+certRoot                | string   |             | REQUIRED. Where to find domins certs (names domain folders with .crt .ey and .ca_bundle files)
+staticRoot              | string   |             | If using static folders, the folder where static folders are placed (when using "$" & "~")
+staticPorts             | number   | 8100        | first port for static sites
 port                    | number   | 443         | 
-requestIpExpiresSeconds | number   | 30          | don't log ip addr after this timeout
-domains                 | object   |             | domains targets
+requestIpExpiresSeconds | number   | 30          | Don't log ip addr after this timeout
+domains                 | object   |             | domain targets { "domain.com": {}, ... }
 allowedIpAddressed      | object   |             | { "::ffff:xxx.xxx": "name" ...} , match beginning of string
-allowedUrlPaths         | array    |             | if request url's beginning matches any of these, allow regardless of permissions
+allowedUrlPaths         | array    |             | if request url's beginning matches any of these, allow regardless of permissions (useful for domain name ownership files)
 pages                   | object   |             | { "statusNNN": htmlBodyForPage, ..., "denied": "access denied" }
 ------------------------|----------|-------------|-------------------------------------------------
 Domain specific options
 ------------------------|----------|-------------|-------------------------------------------------
 root                    | string   |             | root folder of domain: $=staticRoot
 staticFolders           | array    |             | specific sites based on url path
-staitcFolder            | string   |             | site specific root ($ = staticRoot, ~ = user)
+staticFolder            | string   |             | site specific root ($ = staticRoot, ~ = user)
 redirects               | object   |             | { "request-url": "mapped-url" }
 proxyControl            | object   |             | { pset: true } allows remote set,reload (careful!)
-port                    | number   |             | localhiost port
+port                    | number   |             | localhost port
 target                  | string   |             | url of server (using "port" = "https://localhost:port )
 permissions             | object   |             | see permissions
 errors                  | object   |             | { denied: "string if ppermission denied" } (more to come)
 cspSites                | string   |             | if {{sites}} is in the CSP, replce with these
-
-
 ```
 
 ### Permissions
-
 ```
 ------------------------|----------|-------------|-------------------------------------------
 safe                    | bool     | true        | when false, enforce permissions
@@ -86,6 +100,8 @@ allowedIpAddressed      | object   |             | site version of global option
 ```
 
 ### Sample-Config.js
+
+*Some configuration samples.*
 ```
 const allowedIpAddresses = {
     // subnets
