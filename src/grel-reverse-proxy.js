@@ -28,9 +28,9 @@ let logger = require("../lib/grel-logging.js");
 
 const startProxy = async (configFile) => {
     if (!configFile) {
-        let name;
-        if (await fs.exists(name = `./proxy-config.js`)) {
-            configFile = fs.readFile(name);
+        let name = `./proxy-config.js`;
+        if (await fs.exists(name)) {
+            configFile = fs.readFileSync(name);
         }
     }
     if (!configFile) {
